@@ -100,8 +100,24 @@ helm install yugabyte -f expose-all-shared.yaml --namespace yb-demo --name yb-de
 ```
 #### Enable TLS for YugaByte (Note: This is only available for Enterprise Edition)
 The assumption here is you already have the pull secret installed to pull from our private Enterprise Edition registry
+
+YugaByte supports enabling TLS at different levels, and we have three specific GFlags that gives granular
+control over our TLS feature, those flags are
+`allow_insecure_connections`, `use_node_to_node_encryption` and `use_client_to_server_encryption`.
+
+For example if you want to enable TLS just between the data nodes, you would run the below command.
+
 ```
-helm install yugabyte --namespace yb-demo --name yb-demo --set=tls.enabled=true --set=Image.repository=quay.io/yugabyte/yugabyte --set=Image.pullSecretName=yugabyte-k8s-pull-secret --wait
+helm install yugabyte --namespace yb-demo --name yb-demo --set=tls.enabled=true,gflags.master.allow_insecure_connections=false,gflags.master.use_node_to_node_encryption=true,gflags.tserver.allow_insecure_connections=false,gflags.tserver.use_node_to_node_encryption=true,Image.repository=quay.io/yugabyte/yugabyte,Image.pullSecretName=yugabyte-k8s-pull-secret --wait
+```
+If you want to enable TLS just between the client and the data nodes, you would run the below command.
+```
+helm install yugabyte --namespace yb-demo --name yb-demo --set=tls.enabled=true,gflags.master.allow_insecure_connections=false,gflags.tserver.allow_insecure_connections=false,gflags.tserver.use_client_to_server_encryption=true,Image.repository=quay.io/yugabyte/yugabyte,Image.pullSecretName=yugabyte-k8s-pull-secret --wait
+```
+
+By default the YugaByte helm chart uses a predefined root certificate, you can override that certificate to use your own, you need to base64 encode your certificate and key file and use it in the helm command below.
+```
+helm install yugabyte --namespace yb-demo --name yb-demo --set=tls.enabled=true,tls.rootCA.cert=<base64 encoded certificate>,tls.rootCA.key=<base64 encoded key>,gflags.master.allow_insecure_connections=false,gflags.master.use_node_to_node_encryption=true,gflags.tserver.allow_insecure_connections=false,gflags.tserver.use_node_to_node_encryption=true,Image.repository=quay.io/yugabyte/yugabyte,Image.pullSecretName=yugabyte-k8s-pull-secret --wait
 ```
 
 Follow the instructions on the NOTES section.

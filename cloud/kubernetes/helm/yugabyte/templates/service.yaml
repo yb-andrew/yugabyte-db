@@ -221,8 +221,6 @@ spec:
           {{- end}}
           {{ if $root.Values.tls.enabled }}
           - "--certs_dir=/opt/certs/yugabyte"
-          - "--allow_insecure_connections=false"
-          - "--use_node_to_node_encryption=true"
           {{- end }}
         {{ else }}
           - "/home/yugabyte/bin/yb-tserver"
@@ -243,9 +241,6 @@ spec:
           {{- end}}
           {{ if $root.Values.tls.enabled }}
           - "--certs_dir=/opt/certs/yugabyte"
-          - "--allow_insecure_connections=false"
-          - "--use_node_to_node_encryption=true"
-          - "--use_client_to_server_encryption=true"
           {{- end }}
         {{ end }}
         ports:
