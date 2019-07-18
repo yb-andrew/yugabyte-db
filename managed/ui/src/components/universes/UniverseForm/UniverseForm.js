@@ -43,7 +43,7 @@ class UniverseForm extends Component {
     this.getCurrentProvider = this.getCurrentProvider.bind(this);
     this.state = {
       ...initialState,
-      hasFieldChanged: true,
+      hasFieldChanged: false,
       currentView: props.type === "Async" ? 'Async' : 'Primary'
     };
   }
@@ -361,8 +361,6 @@ class UniverseForm extends Component {
     if (type === "Async") {
       if(readOnlyCluster) {
         asyncReplicaBtn = <YBButton btnClass="btn btn-default universe-form-submit-btn" btnText={"Delete this configuration"} onClick={showDeleteReadReplicaModal}/>;
-      } else {
-        //asyncReplicaBtn = <YBButton btnClass="btn btn-orange universe-form-submit-btn" btnText={"Add Read Replica (Beta)"} onClick={this.configureReadOnlyCluster}/>;
       }
     }
     let submitTextLabel = "";
@@ -415,11 +413,11 @@ class UniverseForm extends Component {
     const submitControl = (existingPrimaryNodes.length && existingPrimaryNodes.filter(node => node.state !== "ToBeRemoved").length) || type === "Create"
       ?
         // not a full move
-        <YBButton btnClass="btn btn-orange universe-form-submit-btn" btnText={submitTextLabel} btnType={"submit"} disabled={this.state.hasFieldChanged} />
+        <YBButton btnClass="btn btn-orange universe-form-submit-btn" btnText={submitTextLabel} btnType={"submit"} disabled={!this.state.hasFieldChanged} />
       :
         // full move
         (<Fragment>
-          <YBButton onClick={showFullMoveModal} btnClass="btn btn-orange universe-form-submit-btn" btnText={submitTextLabel} disabled={this.state.hasFieldChanged} />
+          <YBButton onClick={showFullMoveModal} btnClass="btn btn-orange universe-form-submit-btn" btnText={submitTextLabel} disabled={!this.state.hasFieldChanged} />
           
           <YBModal visible={showModal && visibleModal === "fullMoveModal"}
                 onHide={ closeModal } submitLabel={'Proceed'} cancelLabel={'Cancel'} showCancelButton={true} title={ "Confirm Full Move Update" } onFormSubmit={ handleSubmit(this.handleSubmitButtonClick) } >

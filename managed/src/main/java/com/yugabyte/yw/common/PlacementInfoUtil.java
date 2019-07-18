@@ -2,23 +2,8 @@
 
 package com.yugabyte.yw.common;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.Queue;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -100,12 +85,12 @@ public class PlacementInfoUtil {
                                                     PlacementInfo newPlacementInfo) {
 
     // Map between the old placement's AZs and the affinitized leader info.
-    HashMap<UUID, Boolean> oldAZMap = new HashMap<UUID, Boolean>();
+    HashMap<UUID, List<Object>> oldAZMap = new HashMap<UUID, List<Object>>();
 
     for (PlacementCloud oldCloud : oldPlacementInfo.cloudList) {
       for (PlacementRegion oldRegion : oldCloud.regionList) {
         for (PlacementAZ oldAZ : oldRegion.azList) {
-          oldAZMap.put(oldAZ.uuid, oldAZ.isAffinitized);
+          oldAZMap.put(oldAZ.uuid, Arrays.asList(oldAZ.isAffinitized, oldAZ.numNodesInAZ));
         }
       }
     }
@@ -116,8 +101,10 @@ public class PlacementInfoUtil {
           if (!oldAZMap.containsKey(newAZ.uuid)) {
             return false;
           }
-          if (oldAZMap.get(newAZ.uuid) != newAZ.isAffinitized) {
-            // affinitized leader info has changed, return true.
+          if ((Boolean) oldAZMap.get(newAZ.uuid).get(0) != newAZ.isAffinitized ||
+            (int) oldAZMap.get(newAZ.uuid).get(1) != newAZ.numNodesInAZ) {
+            // affinitized leader info has changed or number of nodes
+            // has changed, return true.
             return true;
           }
         }
@@ -935,14 +922,18 @@ public class PlacementInfoUtil {
     // Get node count per azUuid in the current universe.
     Map<UUID, Integer> azUuidToNumNodes = new HashMap<UUID, Integer>();
     for (NodeDetails node : nodeDetailsSet) {
-      if (onlyActive && !node.isActive()) {
+      if (onlyActive && !node.isActive() && node.state != NodeState.ToBeRemoved) {
         continue;
       }
       UUID azUuid = node.azUuid;
-      if (!azUuidToNumNodes.containsKey(azUuid)) {
+      if (node.state == NodeState.ToBeRemoved) {
         azUuidToNumNodes.put(azUuid, 0);
+      } else {
+        if (!azUuidToNumNodes.containsKey(azUuid)) {
+          azUuidToNumNodes.put(azUuid, 0);
+        }
+        azUuidToNumNodes.put(azUuid, azUuidToNumNodes.get(azUuid) + 1);
       }
-      azUuidToNumNodes.put(azUuid, azUuidToNumNodes.get(azUuid) + 1);
     }
 
     LOG.info("Az Map {}", azUuidToNumNodes);
@@ -1300,7 +1291,9 @@ public class PlacementInfoUtil {
         configureNodeEditUsingPlacementInfo(taskParams);
     }
 
-    removeUnusedPlacementAZs(cluster.placementInfo);
+    if (mode != ConfigureNodesMode.UPDATE_CONFIG_FROM_PLACEMENT_INFO) {
+      removeUnusedPlacementAZs(cluster.placementInfo);
+    }
 
     LOG.info("Set of nodes after node configure: {}.", taskParams.nodeDetailsSet);
     LOG.info("Placement info: {}.", cluster.placementInfo);

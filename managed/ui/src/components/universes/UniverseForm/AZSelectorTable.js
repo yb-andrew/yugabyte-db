@@ -9,9 +9,26 @@ import { FlexContainer, FlexShrink, FlexGrow } from '../../common/flexbox/YBFlex
 import { getPrimaryCluster, getReadOnlyCluster, getClusterByType } from '../../../utils/UniverseUtils';
 import { getPromiseState } from 'utils/PromiseUtils';
 
-const nodeStates = {
-  activeStates: ["ToBeAdded", "Provisioned", "SoftwareInstalled", "UpgradeSoftware", "UpdateGFlags", "Live", "Starting"],
-  inactiveStates: ["Unreachable", "ToBeRemoved", "Removing", "Removed", "Decommissioned", "BeingDecommissioned", "Stopping", "Stopped"]
+const nodeStateEnums = {
+  activeStates: {
+    ToBeAdded: "ToBeAdded",
+    Provisioned: "Provisioned",
+    SoftwareInstalled: "SoftwareInstalled",
+    UpgradeSoftware: "UpgradeSoftware",
+    UpdateGFlags: "UpdateGFlags",
+    Live: "Live",
+    Starting: "Starting"
+  },
+  inactiveStates: {
+    Unreachable: "Unreachable",
+    ToBeRemoved: "ToBeRemoved",
+    Removing: "Removing",
+    Removed: "Removed",
+    Decommissioned: "Decommissioned",
+    BeingDecommissioned:  "BeingDecommissioned",
+    Stopping: "Stopping",
+    Stopped: "Stopped"
+  }
 };
 
 export default class AZSelectorTable extends Component {
@@ -205,13 +222,17 @@ export default class AZSelectorTable extends Component {
     if (isNonEmptyObject(universeConfigTemplate) && isNonEmptyObject(universeConfigTemplate.nodeDetailsSet) && isNonEmptyObject(cluster)) {
       currentClusterNodes =
       universeConfigTemplate.nodeDetailsSet.filter(function (nodeItem) {
-        return nodeItem.placementUuid === cluster.uuid && (nodeItem.state === "ToBeAdded" || nodeItem.state === "Live");
+        return nodeItem.placementUuid === cluster.uuid && (
+          nodeItem.state === nodeStateEnums.activeStates.ToBeAdded ||
+          nodeItem.state === nodeStateEnums.activeStates.Live ||
+          nodeItem.state === nodeStateEnums.inactiveStates.ToBeRemoved // In case user wants to revert
+          );
       });
     }
 
     if (isNonEmptyObject(universeConfigTemplate) && isNonEmptyArray(currentClusterNodes)) {
       currentClusterNodes.forEach(function (nodeItem) {
-        if (nodeStates.activeStates.indexOf(nodeItem.state) !== -1) {
+        if (nodeItem.state in nodeStateEnums.activeStates || nodeItem.state === nodeStateEnums.inactiveStates.ToBeRemoved) {
           let nodeFound = false;
           for (let idx = 0; idx < uniConfigArray.length; idx++) {
             if (uniConfigArray[idx].value === nodeItem.azUuid) {
@@ -221,11 +242,16 @@ export default class AZSelectorTable extends Component {
             }
           }
           if (!nodeFound) {
-            uniConfigArray.push({value: nodeItem.azUuid, count: 1});
+            if (nodeItem.state === nodeStateEnums.inactiveStates.ToBeRemoved) {
+              uniConfigArray.push({value: nodeItem.azUuid, count: 0});
+            } else {
+              uniConfigArray.push({value: nodeItem.azUuid, count: 1});
+            }
           }
         }
       });
     }
+
     let groupsArray = [];
     const uniqueRegions = [];
     if (isNonEmptyObject(cluster) &&
@@ -233,7 +259,7 @@ export default class AZSelectorTable extends Component {
         isNonEmptyArray(cluster.placementInfo.cloudList) &&
         isNonEmptyArray(cluster.placementInfo.cloudList[0].regionList)) {
       cluster.placementInfo.cloudList[0].regionList.forEach(function(regionItem) {
-        regionItem.azList.forEach(function(azItem) {
+        regionItem.azList.forEach(function(azItem) {          
           uniConfigArray.forEach(function(configArrayItem) {
             if (configArrayItem.value === azItem.uuid) {
               groupsArray.push({value: azItem.uuid, count: configArrayItem.count,
@@ -270,9 +296,20 @@ export default class AZSelectorTable extends Component {
       }
     }
 
-    return ({groups: groupsArray,
+    const nonZeroUniqueAzs = [
+      ...new Set(groupsArray.reduce((prev, curr) => {
+        if (curr.count > 0) {
+          prev.push(curr.value);
+        }
+        return prev;
+      }, [])
+      )
+    ];
+    return ({
+      groups: groupsArray,
       uniqueRegions: uniqueRegions.length,
-      uniqueAzs: [...new Set(groupsArray.map(item => item.value))].length});
+      uniqueAzs: nonZeroUniqueAzs.length
+    });
   };
 
   componentWillMount() {
